@@ -93,7 +93,7 @@
 <body>
   <main>
     <nav class="menu">
-      <div class="animated-logo" title="Click Me!">
+      <div class="animated-logo" title="click me :)">
         <canvas id="logoCanvas" alt="erodo"></canvas>
       </div>
       <p>Erodo Mono is a new erosion-based typeface</p>
@@ -118,6 +118,9 @@
   const spacing = 0;
   const totalWidth = numLetters * imgSize + (numLetters - 1) * spacing;
   const startX = imgSize;
+  const smolText = 'click me :)';
+
+  let wasClicked = false;
   
   // Cache loaded images per letter/variant
   const imageCache = {};
@@ -145,7 +148,16 @@
   
   function drawWord() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, imgSize, imgSize);
+
+    if (!wasClicked) {
+      ctx.font = '12px Courier New';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(smolText, 4, imgSize-6);
+      wasClicked = true;
+    }
+
     let x = startX;
     word.split('').forEach((letter, i) => {
       const variant = currentVariants[i];
