@@ -1,0 +1,35 @@
+{
+  "textEditor": {
+    "showAssetControls": false,
+    "autoLoadDefault": true,
+    "defaults": {
+      "text": "ERODO\nMONO\nIS A NEW\nEROSION BASED\nBITMAP FONT",
+      "fontPx": 200,
+      "paddingPx": 16,
+      "trackingPx": 0,
+      "lineGapPx": 0,
+      "stretchX": 1,
+      "stretchY": 1,
+      "spaceWidthPx": 200,
+      "wrapChars": 24,
+      "justifyRows": true,
+      "darkMode": false
+    }
+  },
+  "erosionPlayground": {
+    "defaults": {
+      "invertInput": false,
+      "iters": 0,
+      "thresh": 6,
+      "noise": 2,
+      "cutoff": 200,
+      "increment": 5,
+      "steps": 25,
+      "autoOpacity": false,
+      "opacity": 0.1,
+      "conn": "8",
+      "border": "1",
+      "darkMode": false
+    }
+  }
+}

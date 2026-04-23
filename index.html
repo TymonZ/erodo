@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>font-corroder</title>
+</head>
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background-color: #e4e4e4;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Courier New', Courier, monospace;
+  }
+  
+  main {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    margin: 0;
+  }
+
+  footer {
+    padding: 10px;
+  }
+
+  footer * {
+    text-align: center;
+    text-decoration: none;
+    color: #000000;
+    font-size: 12px;
+    margin: 0;
+    padding: 0;
+  }
+
+  nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  nav p {
+    font-size: 16px;
+    margin: 10px;
+  }
+
+  nav a {
+    text-decoration: none;
+    color: #ffffff;
+    background-color: #000000;
+    font-size: 16px;
+    width: 200px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    justify-content: center;
+  }
+
+  nav a:hover {
+    text-decoration: underline;
+  }
+
+  .animated-logo {
+    cursor: pointer;
+    max-width: 80vw;
+  }
+
+  .animated-logo canvas {
+    width: 100%;
+  }
+  /* Trigger animation on click */
+  .animated-logo:active {
+    animation: jump 0.2s ease;
+  }
+
+  /* Jump animation */
+  @keyframes jump {
+    0%   { transform: translateY(0); }
+    30%  { transform: translateY(-5px); }
+    50%  { transform: translateY(0); }
+    70%  { transform: translateY(-2px); }
+    100% { transform: translateY(0); }
+  }
+
+</style>
+<body>
+  <main>
+    <nav class="menu">
+      <div class="animated-logo" title="Click Me!">
+        <canvas id="logoCanvas" alt="erodo"></canvas>
+      </div>
+      <p>Erodo Mono is a new erosion-based typeface</p>
+      <a href="./text-editor/index.html"><div>Try It Out!</div></a>
+      <a href="./erosion-playground/index.html"><div></div>Erosion Editor</div></a>  
+    </nav>
+  </main>  
+  <footer>
+    <p>© <a href="https://instagram.com/tymon_zaniewski" target="_blank">tymon zaniewski</a></p>
+  </footer>
+</body>
+<script>
+  const canvas = document.getElementById('logoCanvas');
+  const ctx = canvas.getContext('2d');
+  
+  canvas.width = canvas.height*6;
+  
+  const word = 'ERODO';
+  const numLetters = word.length;
+  const numOfVariants = 12;
+  const imgSize = canvas.height;
+  const spacing = 0;
+  const totalWidth = numLetters * imgSize + (numLetters - 1) * spacing;
+  const startX = imgSize;
+  
+  // Cache loaded images per letter/variant
+  const imageCache = {};
+  let currentVariants = new Array(numLetters).fill(0);
+  
+  // Load single image, cache it
+  function loadImage(letter, variant, callback) {
+    const key = `${letter}-${variant}`;
+    if (imageCache[key]) {
+      callback(imageCache[key]);
+      return;
+    }
+    
+    const img = new Image();
+    img.src = `assets/letters/${letter}/${variant}.png`;
+    img.onload = () => {
+      imageCache[key] = img;
+      callback(img);
+    };
+    img.onerror = () => {
+      console.warn(`Failed to load assets/letters/${letter}/${variant}.png`);
+      callback(null);
+    };
+  }
+  
+  function drawWord() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, imgSize, imgSize);
+    let x = startX;
+    word.split('').forEach((letter, i) => {
+      const variant = currentVariants[i];
+      const key = `${letter}-${variant}`;
+      const img = imageCache[key];
+      if (img) {
+        ctx.drawImage(img, x, 0, imgSize, imgSize);
+      }
+      x += imgSize + spacing;
+    });
+  }
+  
+  // Preload all variants for all unique letters in the word
+  function preloadAllVariants() {
+    const uniqueLetters = [...new Set(word)];
+    const promises = [];
+    
+    uniqueLetters.forEach(letter => {
+      for (let variant = 0; variant < numOfVariants; variant++) {
+        promises.push(
+          new Promise(resolve => loadImage(letter, variant, resolve))
+        );
+      }
+    });
+    
+    return Promise.all(promises);
+  }
+  
+  // Preload all variants, then draw initial state
+  preloadAllVariants().then(() => {
+    currentVariants = new Array(numLetters).fill(0).map(() => Math.floor(Math.random() * numOfVariants));
+    drawWord();
+  });
+  
+  // Any canvas click randomizes all - instantaneous since images are preloaded
+  canvas.addEventListener('click', (e) => {
+    currentVariants = currentVariants.map(() => Math.floor(Math.random() * numOfVariants));
+    drawWord();
+  });
+</script>
+</html>

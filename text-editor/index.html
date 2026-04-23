@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Text Editor + Export</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --panel: #f6f7f8;
+      --ink: #14171b;
+      --muted: #5f6775;
+      --accent: #3cc98e;
+      --stroke: #d7dde4;
+      --field-bg: #ffffff;
+      --dock-bg: rgba(255, 255, 255, 0.97);
+      --shadow: 0 8px 24px rgba(20, 23, 27, 0.12);
+    }
+
+    body.dark {
+      --bg: #0a0a0a;
+      --panel: #111111;
+      --ink: #ebebeb;
+      --muted: #a0a0a0;
+      --accent: #8f8f8f;
+      --stroke: #2a2a2a;
+      --field-bg: #1a1a1a;
+      --dock-bg: rgba(20, 20, 20, 0.94);
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      scrollbar-width: none;
+    }
+
+    *::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+      display: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .wrap {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .panel {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      align-content: flex-start;
+      gap: 8px 10px;
+      padding: 8px 10px 10px;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--panel);
+      border-right: 1px solid var(--stroke);
+    }
+
+    h1 {
+      width: 100%;
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .row {
+      display: grid;
+      gap: 4px;
+      margin: 0;
+      width: min(190px, 100%);
+    }
+
+    label {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    textarea,
+    input,
+    button {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      background: var(--field-bg);
+      color: var(--ink);
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+
+    textarea {
+      min-height: 62px;
+      max-height: 120px;
+      resize: vertical;
+      line-height: 1.4;
+    }
+
+    .inline {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      width: min(380px, 100%);
+    }
+
+    button {
+      background: var(--accent);
+      color: #08271a;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.08s ease, filter 0.2s ease;
+    }
+
+    button:hover { filter: brightness(1.05); }
+    button:active { transform: translateY(1px); }
+
+    .subtle {
+      background: var(--field-bg);
+      color: var(--ink);
+      border: 1px solid var(--stroke);
+      font-weight: 600;
+    }
+
+    .toggle {
+      position: fixed;
+      left: 10px;
+      bottom: 10px;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 180px;
+      padding: 8px 10px;
+      border: 1px solid var(--stroke);
+      border-radius: 10px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .toggle input {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      accent-color: #777777;
+    }
+
+    .toggle label {
+      margin: 0;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toggle-inline input {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: #777777;
+    }
+
+    .toggle-inline label {
+      margin: 0;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .status {
+      width: 100%;
+      min-height: 16px;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 0;
+    }
+
+    .stage {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .preview-panel {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+      padding: 42px 16px 6px;
+    }
+
+    .preview-header {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .preview-frame {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #preview {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+    }
+
+    .text-dock {
+      position: sticky;
+      bottom: 0;
+      z-index: 25;
+      margin: 8px 12px 10px;
+      padding: 10px;
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      background: var(--dock-bg);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(2px);
+      width: calc(100% - 24px);
+    }
+
+    .text-dock label {
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .text-dock textarea {
+      min-height: 120px;
+      height: 18vh;
+      max-height: 24vh;
+      resize: none;
+    }
+
+    .tiny {
+      width: 100%;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 980px) {
+      .wrap { grid-template-columns: 300px minmax(0, 1fr); }
+      .row { width: min(165px, 100%); }
+      .inline { width: min(330px, 100%); }
+      .preview-panel { padding: 36px 10px 4px; }
+      .text-dock { margin: 6px 8px 8px; width: calc(100% - 16px); }
+      .text-dock textarea { min-height: 90px; height: 16vh; max-height: 20vh; }
+      .toggle { left: 8px; bottom: 8px; width: 164px; padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="panel">
+      <h1>Text Editor</h1>
+
+      <div class="row" id="fntRow">
+        <label for="fntFile">.fnt file</label>
+        <input id="fntFile" type="file" accept=".fnt,text/plain">
+      </div>
+
+      <div class="row" id="atlasRow">
+        <label for="atlasFile">Atlas PNG</label>
+        <input id="atlasFile" type="file" accept="image/png,image/*">
+      </div>
+
+      <div class="inline">
+        <button id="loadDefault" class="subtle" type="button">Load Text Editor</button>
+        <button id="exportBtn" type="button">Export PNG</button>
+      </div>
+
+      <div class="toggle">
+        <input id="darkMode" type="checkbox">
+        <label for="darkMode">Dark mode</label>
+      </div>
+
+      <div class="inline">
+        <div class="row">
+          <label for="fontPx">Font px</label>
+          <input id="fontPx" type="number" min="1" step="1" value="200">
+        </div>
+        <div class="row">
+          <label for="paddingPx">Padding px</label>
+          <input id="paddingPx" type="number" min="0" step="1" value="16">
+        </div>
+      </div>
+
+      <div class="inline">
+        <div class="row">
+          <label for="trackingPx">Tracking px</label>
+          <input id="trackingPx" type="number" step="0.1" value="0">
+        </div>
+        <div class="row">
+          <label for="lineGapPx">Line gap px</label>
+          <input id="lineGapPx" type="number" step="0.1" value="0">
+        </div>
+      </div>
+
+      <div class="inline">
+        <div class="row">
+          <label for="stretchX">Stretch X</label>
+          <input id="stretchX" type="number" min="0.1" step="0.05" value="1">
+        </div>
+        <div class="row">
+          <label for="stretchY">Stretch Y</label>
+          <input id="stretchY" type="number" min="0.1" step="0.05" value="1">
+        </div>
+      </div>
+
+      <div class="row">
+        <label for="spaceWidthPx">Space width px</label>
+        <input id="spaceWidthPx" type="number" min="0" step="0.1" value="200">
+      </div>
+
+      <div class="row">
+        <label for="wrapChars">Wrap at chars</label>
+        <input id="wrapChars" type="number" min="1" step="1" value="24">
+      </div>
+
+      <div class="row">
+        <div class="toggle-inline">
+          <input id="justifyRows" type="checkbox">
+          <label for="justifyRows">Justify rows</label>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="resetView" class="subtle" type="button">Fit Preview</button>
+      </div>
+
+      <div class="status" id="status">Load a .fnt and atlas PNG to start.</div>
+      <div class="tiny">Tip: this exports the rendered text at the exact glyph resolution based on Font px and spacing settings.</div>
+    </section>
+
+    <section class="stage">
+      <div class="preview-panel">
+        <div class="preview-header">
+          <span id="fontInfo">No font loaded</span>
+          <span id="sizeInfo">0 x 0 px</span>
+        </div>
+        <div class="preview-frame">
+          <canvas id="preview"></canvas>
+        </div>
+      </div>
+      <div class="text-dock">
+        <label for="textInput">Text</label>
+        <textarea id="textInput" spellcheck="false">ERODO MONO
+TYPE HERE</textarea>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    "use strict";
+
+    const UI_CONFIG_URL = "../ui-config.json";
+    const defaultUi = {};
+    let SHOW_ASSET_CONTROLS = true;
+    let AUTO_LOAD_DEFAULT = true;
+
+    const state = {
+      font: null,
+      atlasImage: null,
+      atlasName: "",
+      renderCanvas: document.createElement("canvas")
+    };
+
+    const ui = {
+      fntFile: document.getElementById("fntFile"),
+      fntRow: document.getElementById("fntRow"),
+      atlasFile: document.getElementById("atlasFile"),
+      atlasRow: document.getElementById("atlasRow"),
+      loadDefault: document.getElementById("loadDefault"),
+      exportBtn: document.getElementById("exportBtn"),
+      textInput: document.getElementById("textInput"),
+      fontPx: document.getElementById("fontPx"),
+      paddingPx: document.getElementById("paddingPx"),
+      trackingPx: document.getElementById("trackingPx"),
+      lineGapPx: document.getElementById("lineGapPx"),
+      stretchX: document.getElementById("stretchX"),
+      stretchY: document.getElementById("stretchY"),
+      justifyRows: document.getElementById("justifyRows"),
+      darkMode: document.getElementById("darkMode"),
+      spaceWidthPx: document.getElementById("spaceWidthPx"),
+      wrapChars: document.getElementById("wrapChars"),
+      resetView: document.getElementById("resetView"),
+      preview: document.getElementById("preview"),
+      status: document.getElementById("status"),
+      fontInfo: document.getElementById("fontInfo"),
+      sizeInfo: document.getElementById("sizeInfo")
+    };
+
+    const previewCtx = ui.preview.getContext("2d");
+
+    function applyDefaultUiValues() {
+      if (typeof defaultUi.text === "string") ui.textInput.value = defaultUi.text;
+      if (defaultUi.fontPx != null) ui.fontPx.value = String(defaultUi.fontPx);
+      if (defaultUi.paddingPx != null) ui.paddingPx.value = String(defaultUi.paddingPx);
+      if (defaultUi.trackingPx != null) ui.trackingPx.value = String(defaultUi.trackingPx);
+      if (defaultUi.lineGapPx != null) ui.lineGapPx.value = String(defaultUi.lineGapPx);
+      if (defaultUi.stretchX != null) ui.stretchX.value = String(defaultUi.stretchX);
+      if (defaultUi.stretchY != null) ui.stretchY.value = String(defaultUi.stretchY);
+      if (defaultUi.spaceWidthPx != null) ui.spaceWidthPx.value = String(defaultUi.spaceWidthPx);
+      if (defaultUi.wrapChars != null) ui.wrapChars.value = String(defaultUi.wrapChars);
+      if (typeof defaultUi.justifyRows === "boolean") ui.justifyRows.checked = defaultUi.justifyRows;
+      if (typeof defaultUi.darkMode === "boolean") ui.darkMode.checked = defaultUi.darkMode;
+    }
+
+    function applyUiVisibility() {
+      if (SHOW_ASSET_CONTROLS) return;
+      ui.fntRow.style.display = "none";
+      ui.atlasRow.style.display = "none";
+      ui.loadDefault.style.display = "none";
+    }
+
+    async function loadRendererConfig() {
+      try {
+        const res = await fetch(UI_CONFIG_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error("Could not fetch ui-config.json");
+        const config = await res.json();
+        const textEditorConfig = config.textEditor || {};
+        SHOW_ASSET_CONTROLS = textEditorConfig.showAssetControls !== false;
+        AUTO_LOAD_DEFAULT = textEditorConfig.autoLoadDefault !== false;
+        Object.assign(defaultUi, textEditorConfig.defaults || {});
+      } catch (err) {
+        console.warn("Using built-in text editor defaults.", err);
+      }
+
+      applyDefaultUiValues();
+      applyUiVisibility();
+
+      if (AUTO_LOAD_DEFAULT) {
+        setTimeout(loadDefaultTextEditor, 30);
+      }
+    }
+
+    function setStatus(msg, isError) {
+      ui.status.textContent = msg;
+      ui.status.style.color = isError ? "#ff8f8f" : "#a8b2c4";
+    }
+
+    function parseBmLine(line) {
+      const out = {};
+      const re = /(\w+)=(("[^"]*")|[^\s]+)/g;
+      let match;
+      while ((match = re.exec(line))) {
+        let val = match[2];
+        if (val.startsWith("\"") && val.endsWith("\"")) {
+          val = val.slice(1, -1);
+        }
+        if (/^-?\d+(\.\d+)?$/.test(val)) {
+          out[match[1]] = Number(val);
+        } else {
+          out[match[1]] = val;
+        }
+      }
+      return out;
+    }
+
+    function parseBmFont(text) {
+      const lines = text.split(/\r?\n/);
+      const font = {
+        info: {},
+        common: {},
+        pages: new Map(),
+        chars: new Map(),
+        kernings: new Map()
+      };
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+
+        if (line.startsWith("info ")) {
+          font.info = parseBmLine(line);
+          continue;
+        }
+        if (line.startsWith("common ")) {
+          font.common = parseBmLine(line);
+          continue;
+        }
+        if (line.startsWith("page ")) {
+          const p = parseBmLine(line);
+          if (typeof p.id === "number") font.pages.set(p.id, p.file || "");
+          continue;
+        }
+        if (line.startsWith("char ")) {
+          const ch = parseBmLine(line);
+          if (typeof ch.id === "number") font.chars.set(ch.id, ch);
+          continue;
+        }
+        if (line.startsWith("kerning ")) {
+          const k = parseBmLine(line);
+          if (typeof k.first === "number" && typeof k.second === "number") {
+            font.kernings.set(k.first + "," + k.second, Number(k.amount || 0));
+          }
+        }
+      }
+
+      if (!font.common.lineHeight) {
+        throw new Error("Invalid BMFont: missing common lineHeight.");
+      }
+      if (font.chars.size === 0) {
+        throw new Error("Invalid BMFont: no glyphs found.");
+      }
+
+      return font;
+    }
+
+    function loadImageFromBlob(blob) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(blob);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          resolve(img);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("Failed to load atlas image."));
+        };
+        img.src = url;
+      });
+    }
+
+    async function loadImageFromFile(file) {
+      return loadImageFromBlob(file);
+    }
+
+    function getKerning(font, first, second) {
+      return font.kernings.get(first + "," + second) || 0;
+    }
+
+    function getSettings() {
+      const sanitizedText = (ui.textInput.value || "").toUpperCase();
+      if (ui.textInput.value !== sanitizedText) {
+        ui.textInput.value = sanitizedText;
+      }
+      return {
+        text: sanitizedText,
+        fontPx: Math.max(1, Number(ui.fontPx.value) || 1),
+        paddingPx: Math.max(0, Number(ui.paddingPx.value) || 0),
+        trackingPx: Number(ui.trackingPx.value) || 0,
+        lineGapPx: Number(ui.lineGapPx.value) || 0,
+        stretchX: Math.max(0.1, Number(ui.stretchX.value) || 1),
+        stretchY: Math.max(0.1, Number(ui.stretchY.value) || 1),
+        justifyRows: ui.justifyRows.checked,
+        darkMode: ui.darkMode.checked,
+        spaceWidthPx: Math.max(0, Number(ui.spaceWidthPx.value) || 0),
+        wrapChars: Math.max(1, Math.floor(Number(ui.wrapChars.value) || 1))
+      };
+    }
+
+    function wrapTextByWords(text, maxCharsPerLine) {
+      const sourceLines = text.replace(/\r/g, "").split("\n");
+      const wrapped = [];
+
+      for (const rawLine of sourceLines) {
+        const words = rawLine.trim().split(/\s+/).filter(Boolean);
+        if (words.length === 0) {
+          wrapped.push("");
+          continue;
+        }
+
+        let currentLine = "";
+        for (const word of words) {
+          if (!currentLine) {
+            currentLine = word;
+            continue;
+          }
+
+          const candidate = currentLine + " " + word;
+          if (candidate.length <= maxCharsPerLine) {
+            currentLine = candidate;
+          } else {
+            wrapped.push(currentLine);
+            currentLine = word;
+          }
+        }
+
+        wrapped.push(currentLine);
+      }
+
+      return wrapped;
+    }
+
+    function measureLayout(font, settings) {
+      const lines = wrapTextByWords(settings.text, settings.wrapChars);
+      const glyphDrawWidth = settings.fontPx * settings.stretchX;
+      const glyphDrawHeight = settings.fontPx * settings.stretchY;
+
+      const spaceAdvance = settings.spaceWidthPx;
+      const fallbackAdvance = spaceAdvance > 0 ? spaceAdvance : glyphDrawWidth * 0.5;
+
+      function measureBaseLineWidth(line) {
+        let width = 0;
+        for (const symbol of line) {
+          const code = symbol.codePointAt(0);
+          if (code === 32) {
+            width += spaceAdvance + settings.trackingPx;
+            continue;
+          }
+
+          const glyph = font.chars.get(code);
+          if (glyph) {
+            width += glyphDrawWidth + settings.trackingPx;
+          } else {
+            width += fallbackAdvance + settings.trackingPx;
+          }
+        }
+        return Math.max(0, width);
+      }
+
+      const rowData = lines.map((line) => {
+        return {
+          line: line,
+          baseWidth: measureBaseLineWidth(line),
+          scale: 1
+        };
+      });
+
+      if (settings.justifyRows) {
+        let targetWidth = 0;
+        for (const row of rowData) {
+          if (row.baseWidth > targetWidth) targetWidth = row.baseWidth;
+        }
+
+        if (targetWidth > 0) {
+          for (const row of rowData) {
+            row.scale = row.baseWidth > 0 ? targetWidth / row.baseWidth : 1;
+          }
+        }
+      }
+
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      const positioned = [];
+      let penY = 0;
+
+      rowData.forEach((row) => {
+        const line = row.line;
+        const rowScale = row.scale;
+        const rowGlyphWidth = glyphDrawWidth * rowScale;
+        const rowGlyphHeight = glyphDrawHeight * rowScale;
+        const rowTracking = settings.trackingPx * rowScale;
+        const rowSpaceAdvance = spaceAdvance * rowScale;
+        const rowFallbackAdvance = fallbackAdvance * rowScale;
+        let penX = 0;
+
+        for (const symbol of line) {
+          const code = symbol.codePointAt(0);
+          if (code === 32) {
+            penX += rowSpaceAdvance + rowTracking;
+            continue;
+          }
+          const glyph = font.chars.get(code);
+
+          if (!glyph) {
+            penX += rowFallbackAdvance + rowTracking;
+            continue;
+          }
+
+          // Keep glyphs aligned to a consistent grid while allowing non-uniform stretch.
+          const gx = Math.round(penX);
+          const gy = Math.round(penY);
+          const gw = Math.round(rowGlyphWidth);
+          const gh = Math.round(rowGlyphHeight);
+
+          positioned.push({ glyph: glyph, x: gx, y: gy, w: gw, h: gh });
+
+          if (gw > 0 && gh > 0) {
+            minX = Math.min(minX, gx);
+            minY = Math.min(minY, gy);
+            maxX = Math.max(maxX, gx + gw);
+            maxY = Math.max(maxY, gy + gh);
+          }
+
+          penX += rowGlyphWidth + rowTracking;
+        }
+
+        penY += rowGlyphHeight + settings.lineGapPx;
+      });
+
+      if (!isFinite(minX)) {
+        minX = 0;
+        minY = 0;
+        maxX = 1;
+        maxY = Math.max(1, glyphDrawHeight + settings.lineGapPx);
+      }
+
+      const width = Math.max(1, Math.ceil(maxX - minX + settings.paddingPx * 2));
+      const height = Math.max(1, Math.ceil(maxY - minY + settings.paddingPx * 2));
+
+      return {
+        scale: 1,
+        positioned: positioned,
+        minX: minX,
+        minY: minY,
+        width: width,
+        height: height
+      };
+    }
+
+    function invertCanvasRgbKeepAlpha(canvas) {
+      const ctx = canvas.getContext("2d");
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const px = img.data;
+
+      for (let i = 0; i < px.length; i += 4) {
+        px[i] = 255 - px[i];
+        px[i + 1] = 255 - px[i + 1];
+        px[i + 2] = 255 - px[i + 2];
+      }
+
+      ctx.putImageData(img, 0, 0);
+    }
+
+    function drawToCanvas(canvas, font, atlas, layout, paddingPx, darkMode) {
+      canvas.width = layout.width;
+      canvas.height = layout.height;
+      const ctx = canvas.getContext("2d");
+    //   ctx.fillStyle = "#ffffff";
+    //   ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
+
+      const offX = paddingPx - layout.minX;
+      const offY = paddingPx - layout.minY;
+
+      for (const item of layout.positioned) {
+        const g = item.glyph;
+        ctx.drawImage(
+          atlas,
+          g.x,
+          g.y,
+          g.width,
+          g.height,
+          item.x + offX,
+          item.y + offY,
+          item.w,
+          item.h
+        );
+      }
+
+      if (darkMode) {
+        invertCanvasRgbKeepAlpha(canvas);
+      }
+    }
+
+    function drawPreview() {
+      if (!state.font || !state.atlasImage) {
+        previewCtx.clearRect(0, 0, ui.preview.width, ui.preview.height);
+        return;
+      }
+
+      const settings = getSettings();
+      document.body.classList.toggle("dark", settings.darkMode);
+      const layout = measureLayout(state.font, settings);
+      drawToCanvas(state.renderCanvas, state.font, state.atlasImage, layout, settings.paddingPx, settings.darkMode);
+
+      const cssW = ui.preview.clientWidth;
+      const cssH = ui.preview.clientHeight;
+      const dpr = window.devicePixelRatio || 1;
+      ui.preview.width = Math.max(1, Math.floor(cssW * dpr));
+      ui.preview.height = Math.max(1, Math.floor(cssH * dpr));
+
+      previewCtx.setTransform(1, 0, 0, 1, 0, 0);
+      previewCtx.clearRect(0, 0, ui.preview.width, ui.preview.height);
+      previewCtx.imageSmoothingEnabled = false;
+
+      const fitScale = Math.min(
+        ui.preview.width / state.renderCanvas.width,
+        ui.preview.height / state.renderCanvas.height
+      );
+      const finalScale = Math.max(0.05, fitScale);
+      const drawW = state.renderCanvas.width * finalScale;
+      const drawH = state.renderCanvas.height * finalScale;
+      const dx = (ui.preview.width - drawW) * 0.5;
+      const dy = (ui.preview.height - drawH) * 0.5;
+
+      previewCtx.drawImage(state.renderCanvas, dx, dy, drawW, drawH);
+      ui.sizeInfo.textContent = state.renderCanvas.width + " x " + state.renderCanvas.height + " px";
+    }
+
+    function suggestExportName(text) {
+      const firstLine = (text || "text").split(/\r?\n/)[0].trim();
+      const base = (firstLine || "text")
+        .replace(/[^a-zA-Z0-9 _-]/g, "")
+        .trim()
+        .replace(/\s+/g, "_")
+        .slice(0, 42);
+      return (base || "text") + ".png";
+    }
+
+    async function handleFntUpload(file) {
+      if (!file) return;
+      const text = await file.text();
+      state.font = parseBmFont(text);
+      ui.fontInfo.textContent = (state.font.info.face || "BMFont") + " | native size " + (state.font.info.size || state.font.common.lineHeight);
+      setStatus("Loaded .fnt file: " + file.name, false);
+
+      const declaredPage = state.font.pages.get(0);
+      if (declaredPage && !state.atlasImage) {
+        setStatus("Font loaded. Now select atlas PNG (expected: " + declaredPage + ").", false);
+      }
+      drawPreview();
+    }
+
+    async function handleAtlasUpload(file) {
+      if (!file) return;
+      state.atlasImage = await loadImageFromFile(file);
+      state.atlasName = file.name;
+      setStatus("Loaded atlas: " + file.name, false);
+      drawPreview();
+    }
+
+    async function loadDefaultTextEditor() {
+      try {
+        const fntRes = await fetch("../assets/ErodoMono.fnt", { cache: "no-store" });
+        if (!fntRes.ok) throw new Error("Could not fetch ErodoMono.fnt");
+        const fntText = await fntRes.text();
+        state.font = parseBmFont(fntText);
+
+        const pageName = (state.font.pages.get(0) || "ErodoMono.png").split(/[\\/]/).pop();
+        const imgRes = await fetch("../assets/" + pageName, { cache: "no-store" });
+        if (!imgRes.ok) throw new Error("Could not fetch atlas " + pageName);
+        const blob = await imgRes.blob();
+        state.atlasImage = await loadImageFromBlob(blob);
+        state.atlasName = pageName;
+
+        ui.fontInfo.textContent = (state.font.info.face || "BMFont") + " | native size " + (state.font.info.size || state.font.common.lineHeight);
+        setStatus("Loaded default text editor assets.", false);
+        drawPreview();
+      } catch (err) {
+        setStatus("Auto-load failed. Use the file pickers to load .fnt and PNG manually.", true);
+      }
+    }
+
+    function exportPng() {
+      if (!state.font || !state.atlasImage) {
+        setStatus("Load both .fnt and atlas PNG before exporting.", true);
+        return;
+      }
+
+      const settings = getSettings();
+      document.body.classList.toggle("dark", settings.darkMode);
+      const layout = measureLayout(state.font, settings);
+      const outCanvas = document.createElement("canvas");
+      drawToCanvas(outCanvas, state.font, state.atlasImage, layout, settings.paddingPx, settings.darkMode);
+
+      const link = document.createElement("a");
+      link.href = outCanvas.toDataURL("image/png");
+      link.download = suggestExportName(settings.text);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      setStatus("Exported PNG at " + outCanvas.width + " x " + outCanvas.height + " px.", false);
+    }
+
+    ui.fntFile.addEventListener("change", async (ev) => {
+      try {
+        await handleFntUpload(ev.target.files && ev.target.files[0]);
+      } catch (err) {
+        setStatus("Failed to parse .fnt: " + err.message, true);
+      }
+    });
+
+    ui.atlasFile.addEventListener("change", async (ev) => {
+      try {
+        await handleAtlasUpload(ev.target.files && ev.target.files[0]);
+      } catch (err) {
+        setStatus(err.message || "Failed to load atlas image.", true);
+      }
+    });
+
+    ui.loadDefault.addEventListener("click", loadDefaultTextEditor);
+    ui.exportBtn.addEventListener("click", exportPng);
+    ui.resetView.addEventListener("click", drawPreview);
+    ui.darkMode.addEventListener("change", drawPreview);
+    ui.justifyRows.addEventListener("change", drawPreview);
+
+    [ui.textInput, ui.fontPx, ui.paddingPx, ui.trackingPx, ui.lineGapPx, ui.stretchX, ui.stretchY, ui.spaceWidthPx, ui.wrapChars].forEach((el) => {
+      el.addEventListener("input", drawPreview);
+    });
+
+    window.addEventListener("resize", drawPreview);
+
+    loadRendererConfig();
+  </script>
+</body>
+</html>
