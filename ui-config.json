@@ -25,6 +25,7 @@
       "cutoff": 200,
       "increment": 5,
       "steps": 25,
+      "startFromCurrentIterations": false,
       "autoOpacity": false,
       "opacity": 0.1,
       "conn": "8",

@@ -403,6 +403,7 @@
   <label>Cutoff <input id="cutoff" type="range" min="0" max="255" value="200"><span id="cutoffVal" style="margin-left:8px;min-width:36px;display:inline-block;text-align:right">200</span></label>
   <button id="export">Export frame</button>
   <div class="divider" aria-hidden="true"></div>
+  <label>Start from current iterations <input id="startFromCurrentIterations" type="checkbox"></label>
   <label>Increment <input id="increment" type="number" min="1" value="10"></label>
   <label>Steps <input id="steps" type="number" min="1" value="5"></label>
   <button id="runSequence">Run sequence</button>
@@ -440,6 +441,7 @@
       cutoff: 200,
       increment: 10,
       steps: 5,
+      startFromCurrentIterations: false,
       invertInput: false,
       autoOpacity: false,
       opacity: 0.1,
@@ -728,7 +730,10 @@
       const applyDarkInvert = !!options.applyDarkInvert;
       const increment = Math.max(1, parseInt(document.getElementById('increment').value) || 1);
       const steps = Math.max(1, parseInt(document.getElementById('steps').value) || 1);
-      const startIter = 0;
+      const startFromCurrentIterations = !!document.getElementById('startFromCurrentIterations')?.checked;
+      const startIter = startFromCurrentIterations
+        ? (parseInt(document.getElementById('iters')?.value || '0', 10) || 0)
+        : 0;
       const conn = +document.getElementById('conn').value;
       const thresh = +document.getElementById('thresh').value;
       const noise = +document.getElementById('noise').value;
