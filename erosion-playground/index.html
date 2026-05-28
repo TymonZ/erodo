@@ -392,7 +392,6 @@
     <!-- <div class="animated-logo"><canvas id="logoCanvas"></canvas></div> -->
     <h1>Erosion Playground</h1>
     <div class="divider" aria-hidden="true"></div>
-    <h1>Erosion Playground</h1>
     <button id="chooseFile" class="file-trigger" type="button">Load file</button>
     <label>Invert input <input id="invertInput" type="checkbox"></label>
     <input id="file" type="file" accept="image/png,image/*">
@@ -410,6 +409,8 @@
   <label>Auto opacity <input id="autoOpacity" type="checkbox"></label>
   <label>Opacity <input id="opacity" type="range" min="0" max="1" step="0.01" value="0.1"><span id="opacityVal" style="margin-left:8px;min-width:36px;display:inline-block;text-align:right">10%</span></label>
   <button id="exportSequence">Export sequence</button>
+  <button id="exportGradient">Export gradient</button>
+  <label>Transparent bg <input id="isTransparent" type="checkbox"></label>
     <div class="hint">Exports 1px per cell.</div>
     <canvas id="exportcanvas" style="display:none;"></canvas>
   </div>
@@ -444,7 +445,8 @@
       opacity: 0.1,
       conn: '8',
       border: '1',
-      darkMode: false
+      darkMode: false,
+      isTransparent: true
     };
 
     async function loadUiConfig() {
@@ -1015,6 +1017,40 @@
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
+      });
+
+      document.getElementById('exportGradient').addEventListener('click', () => {
+        if(!sequenceFrames || sequenceFrames.length === 0) return;
+        // Get the actual frame dimensions without any border/padding
+        const frameW = sequenceFrames[0].canvas.width;
+        const frameH = sequenceFrames[0].canvas.height;
+        if(frameW <= 0 || frameH <= 0) return;
+        // Create a new canvas with just the image size
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = frameW;
+        exportCanvas.height = frameH;
+        const ctx = exportCanvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        // Fill with white background if not transparent
+        const isTransparentEl = document.getElementById('isTransparent');
+        const shouldBeTransparent = !isTransparentEl || isTransparentEl.checked;
+        if(!shouldBeTransparent) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, frameW, frameH);
+        }
+        // Draw all frames overlaid at their actual size with opacity
+        const opacity = getEffectiveOverlayOpacity(countNonEmptyFrames(sequenceFrames));
+        ctx.globalAlpha = opacity;
+        for(const frame of sequenceFrames){
+          ctx.drawImage(frame.canvas, 0, 0);
+        }
+        ctx.globalAlpha = 1;
+        // Apply dark mode inversion if needed
+        if(isDarkModeEnabled()) invertCanvasRgbKeepAlpha(exportCanvas);
+        const link = document.createElement('a');
+        link.download = 'eroded_gradient.png';
+        link.href = exportCanvas.toDataURL();
+        link.click();
       });
 
       loadUiConfig().then(() => {
